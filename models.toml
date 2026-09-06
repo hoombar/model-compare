@@ -1,0 +1,17 @@
+# Short alias -> OpenRouter model slug.
+# Full slugs are also accepted anywhere an alias is used (e.g. openai/gpt-5-mini).
+
+gpt = "openai/gpt-5-mini"
+claude = "anthropic/claude-sonnet-4.5"
+gemini = "google/gemini-2.5-pro"
+deepseek = "deepseek/deepseek-chat-v3.1"
+grok = "x-ai/grok-4-fast"
+haiku = "anthropic/claude-3.5-haiku"
+flash = "google/gemini-2.5-flash"
+
+# default_system_prompt = "You are a thoughtful assistant."
+
+[presets]
+default = ["gpt", "claude", "gemini"]
+reasoning = ["gpt", "claude", "deepseek"]
+budget = ["flash", "haiku"]
