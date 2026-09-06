@@ -28,8 +28,8 @@ responses, no API calls), `--out DIR`.
 
 ## Prompt files
 
-Markdown with YAML frontmatter; the body is the user prompt. Models are chosen per run
-via `--models`, so prompt files stay simple.
+Markdown with YAML frontmatter; the body is the user prompt. Models are never listed in
+prompt files — they're chosen per run via `--models`.
 
 ```markdown
 ---
@@ -43,16 +43,22 @@ A runaway trolley is heading toward five people...
 ```
 
 Any format requirements (single paragraph, include a diagram, etc.) belong in
-`system_prompt`.
+`system_prompt`; if omitted, a sensible default is used (override for all prompts with
+`default_system_prompt` in `models.toml`). `title` is also optional and defaults to the
+filename.
 
 ## Output
 
-Each run writes to `runs/<timestamp>-<prompt-slug>/`:
+Each run writes to `runs/<timestamp>-<prompt-slug>/` (`runs/` is gitignored; `--dry-run`
+runs are prefixed `dryrun-`):
 
 - `report.md` — comparison table (model, latency, tokens, cost) plus every model's full
   response; renders in Obsidian/VS Code/GitHub
 - `report.html` — self-contained page with embedded CSS + mermaid.js for the browser
 - `responses/<model>.md` — raw per-model responses
+
+Models that fail (rate limits, provider errors) don't abort the run — they show up as
+`(error)` rows in the table and error blocks in their section.
 
 ## models.toml
 
@@ -61,4 +67,8 @@ Short aliases map to OpenRouter slugs:
 ```toml
 gpt = "openai/gpt-5.6-luna"
 glm-flash = "z-ai/glm-5.3-flash"
+
+# default_system_prompt = "You are a thoughtful assistant."
 ```
+
+See `uv run model-compare --help` for all flags.
