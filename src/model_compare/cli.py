@@ -37,8 +37,8 @@ def _parse_args(argv: list[str]) -> argparse.Namespace:
     parser.add_argument("prompt_file", type=Path, help="Markdown prompt file with YAML frontmatter")
     parser.add_argument(
         "--models",
-        required=True,
-        help="Comma-separated aliases (models.toml) or OpenRouter slugs, e.g. gpt,glm-flash",
+        help="Comma-separated aliases (models.toml) or OpenRouter slugs; "
+        "defaults to all aliases in models.toml",
     )
     parser.add_argument("--config", type=Path, default=Path("models.toml"), help="Config path")
     parser.add_argument("--out", type=Path, default=Path("runs"), help="Output root directory")
@@ -47,9 +47,24 @@ def _parse_args(argv: list[str]) -> argparse.Namespace:
     )
     parser.add_argument("--no-html", action="store_true", help="Skip HTML export")
     parser.add_argument(
+        "-y", "--yes", action="store_true", help="Skip the model confirmation prompt"
+    )
+    parser.add_argument(
         "--dry-run", action="store_true", help="Use canned responses instead of calling the API"
     )
     return parser.parse_args(argv)
+
+
+def _confirm(pairs: list[tuple[str, str]]) -> bool:
+    width = max(len(alias) for alias, _ in pairs)
+    print(f"About to run against {len(pairs)} model(s):")
+    for alias, slug in pairs:
+        print(f"  {alias:{width}}  {slug}")
+    try:
+        answer = input("Proceed? [y/N] ")
+    except EOFError:
+        return False
+    return answer.strip().lower() in ("y", "yes")
 
 
 def _dry_results(pairs: list[tuple[str, str]]) -> list[ModelResult]:
@@ -118,11 +133,15 @@ def main(argv: list[str] | None = None) -> int:
         print(f"error: {exc}", file=sys.stderr)
         return 1
 
-    raw_models = [m.strip() for m in args.models.split(",") if m.strip()]
+    raw_models = (
+        [m.strip() for m in args.models.split(",") if m.strip()]
+        if args.models
+        else list(config.aliases)
+    )
     pairs = resolve_models(raw_models, config)
     if not pairs:
         print(
-            "error: no resolvable models. Add aliases to models.toml or use full slugs.",
+            "error: no models to run. Pass --models or add aliases to models.toml.",
             file=sys.stderr,
         )
         return 1
@@ -137,6 +156,9 @@ def main(argv: list[str] | None = None) -> int:
                 file=sys.stderr,
             )
             return 1
+        if not args.yes and not _confirm(pairs):
+            print("Cancelled.")
+            return 0
         print(f"Running '{prompt.title}' against {len(pairs)} model(s)...")
         results = asyncio.run(
             run_all(pairs, prompt.system_prompt, prompt.body, api_key, args.timeout)

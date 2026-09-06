@@ -16,12 +16,14 @@ cp .env.example .env   # then add your OpenRouter API key
 ```bash
 uv run model-compare prompts/trolley.md --models gpt,glm-flash,deepseek,hy4
 uv run model-compare prompts/trolley.md --models tencent/hy4-preview,xiaomi/mimo-v2.5
+uv run model-compare prompts/trolley.md                 # every alias in models.toml
 ```
 
-`--models` is required: give it short aliases from `models.toml` (currently the top 10
-most popular models on OpenRouter — refresh from the
-[rankings](https://openrouter.ai/rankings) when picking) or full OpenRouter slugs.
-Useful flags: `--timeout SECONDS` (default 180), `--no-html`, `--dry-run` (canned
+`--models` takes short aliases from `models.toml` (currently the top 10 most popular
+models on OpenRouter — refresh from the [rankings](https://openrouter.ai/rankings) when
+picking) or full OpenRouter slugs. Omit it to run against every alias in `models.toml`;
+either way you'll be asked to confirm the model list before anything runs (`-y` skips
+that). Other flags: `--timeout SECONDS` (default 180), `--no-html`, `--dry-run` (canned
 responses, no API calls), `--out DIR`.
 
 ## Prompt files
