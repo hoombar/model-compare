@@ -154,7 +154,8 @@ def main(argv: list[str] | None = None) -> int:
         )
 
     stamp = dt.datetime.now().astimezone().strftime("%Y%m%d-%H%M%S")
-    run_dir = args.out / f"{stamp}-{slugify(prompt.title)}"
+    prefix = "dryrun-" if args.dry_run else ""
+    run_dir = args.out / f"{prefix}{stamp}-{slugify(prompt.title)}"
     md_path = write_run(run_dir, prompt, results, stamp)
     html_path = None if args.no_html else write_html(md_path, prompt.title)
 
