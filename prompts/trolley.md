@@ -1,6 +1,5 @@
 ---
 title: "The Trolley Problem"
-models: [gpt, glm-flash, deepseek, hy4]
 system_prompt: |
   You are a thoughtful assistant helping evaluate different language models.
 

@@ -10,8 +10,8 @@ import random
 import sys
 from pathlib import Path
 
-from .config import Config, load_config, resolve_models
-from .prompts import PromptSpec, load_prompt
+from .config import load_config, resolve_models
+from .prompts import load_prompt
 from .report import slugify, write_html, write_run
 from .runner import ModelResult, run_all
 
@@ -37,7 +37,8 @@ def _parse_args(argv: list[str]) -> argparse.Namespace:
     parser.add_argument("prompt_file", type=Path, help="Markdown prompt file with YAML frontmatter")
     parser.add_argument(
         "--models",
-        help="Comma-separated aliases (models.toml) or OpenRouter slugs; overrides frontmatter",
+        required=True,
+        help="Comma-separated aliases (models.toml) or OpenRouter slugs, e.g. gpt,glm-flash",
     )
     parser.add_argument("--config", type=Path, default=Path("models.toml"), help="Config path")
     parser.add_argument("--out", type=Path, default=Path("runs"), help="Output root directory")
@@ -49,18 +50,6 @@ def _parse_args(argv: list[str]) -> argparse.Namespace:
         "--dry-run", action="store_true", help="Use canned responses instead of calling the API"
     )
     return parser.parse_args(argv)
-
-
-def _select_models(args: argparse.Namespace, prompt: PromptSpec, config: Config) -> list[str]:
-    if args.models:
-        return [m for m in args.models.split(",") if m.strip()]
-    if prompt.models:
-        return prompt.models
-    raise SystemExit(
-        "error: no models specified. Use --models (e.g. --models gpt,glm-flash) or add a "
-        f"'models:' list to the prompt frontmatter.\nAvailable aliases: "
-        f"{', '.join(sorted(config.aliases)) or '(none - add some to models.toml)'}"
-    )
 
 
 def _dry_results(pairs: list[tuple[str, str]]) -> list[ModelResult]:
@@ -129,7 +118,7 @@ def main(argv: list[str] | None = None) -> int:
         print(f"error: {exc}", file=sys.stderr)
         return 1
 
-    raw_models = _select_models(args, prompt, config)
+    raw_models = [m.strip() for m in args.models.split(",") if m.strip()]
     pairs = resolve_models(raw_models, config)
     if not pairs:
         print(
