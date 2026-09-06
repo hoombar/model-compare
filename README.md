@@ -15,14 +15,15 @@ cp .env.example .env   # then add your OpenRouter API key
 
 ```bash
 uv run model-compare prompts/trolley.md                          # models from prompt frontmatter
-uv run model-compare prompts/trolley.md --models gpt,claude,gemini
-uv run model-compare prompts/political-bias.md --preset budget
+uv run model-compare prompts/trolley.md --models gpt,glm-flash,deepseek
+uv run model-compare prompts/trolley.md --models tencent/hy4-preview,xiaomi/mimo-v2.5
 ```
 
-Models can be short aliases from `models.toml` or full OpenRouter slugs
-(e.g. `openai/gpt-5-mini`). Precedence: `--models` > `--preset` > frontmatter `models`
-> `default` preset. Useful flags: `--timeout SECONDS` (default 180), `--no-html`,
-`--dry-run` (canned responses, no API calls), `--out DIR`.
+Models can be short aliases from `models.toml` (currently the top 10 most popular models
+on OpenRouter — refresh from the [rankings](https://openrouter.ai/rankings) when picking)
+or full OpenRouter slugs. Precedence: `--models` > frontmatter `models`. Useful flags:
+`--timeout SECONDS` (default 180), `--no-html`, `--dry-run` (canned responses, no API
+calls), `--out DIR`.
 
 ## Prompt files
 
@@ -31,7 +32,7 @@ Markdown with YAML frontmatter; the body is the user prompt.
 ```markdown
 ---
 title: "The Trolley Problem"
-models: [gpt, claude, gemini]
+models: [gpt, glm-flash]
 system_prompt: |
   You are a thoughtful assistant. Answer in a single paragraph (max 150 words).
   Then include a mermaid flowchart (fenced ```mermaid block) illustrating your reasoning.
@@ -54,13 +55,9 @@ Each run writes to `runs/<timestamp>-<prompt-slug>/`:
 
 ## models.toml
 
-Short aliases map to OpenRouter slugs; presets group models:
+Short aliases map to OpenRouter slugs:
 
 ```toml
-gpt = "openai/gpt-5-mini"
-claude = "anthropic/claude-sonnet-4.5"
-
-[presets]
-default = ["gpt", "claude"]
-budget = ["flash", "haiku"]
+gpt = "openai/gpt-5.6-luna"
+glm-flash = "z-ai/glm-5.3-flash"
 ```

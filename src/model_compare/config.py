@@ -16,7 +16,6 @@ DEFAULT_SYSTEM_PROMPT = (
 @dataclass
 class Config:
     aliases: dict[str, str] = field(default_factory=dict)
-    presets: dict[str, list[str]] = field(default_factory=dict)
     default_system_prompt: str = DEFAULT_SYSTEM_PROMPT
 
 
@@ -29,9 +28,7 @@ def load_config(path: Path | None = None) -> Config:
     with candidate.open("rb") as f:
         data = tomllib.load(f)
     default_system_prompt = data.pop("default_system_prompt", None)
-    presets = data.pop("presets", {}) or {}
     config.aliases = {str(k): str(v) for k, v in data.items()}
-    config.presets = {str(k): [str(m) for m in v] for k, v in presets.items()}
     if default_system_prompt:
         config.default_system_prompt = str(default_system_prompt)
     return config

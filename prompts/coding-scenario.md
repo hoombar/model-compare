@@ -1,6 +1,6 @@
 ---
 title: "Code Review Scenario: Fragile API Fetch"
-models: [gpt, claude, deepseek]
+models: [gpt, glm, deepseek, mimo]
 system_prompt: |
   You are a senior software engineer reviewing a colleague's code. Respond with:
   1. A one-paragraph assessment of the problems.

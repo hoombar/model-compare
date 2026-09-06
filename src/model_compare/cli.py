@@ -37,10 +37,8 @@ def _parse_args(argv: list[str]) -> argparse.Namespace:
     parser.add_argument("prompt_file", type=Path, help="Markdown prompt file with YAML frontmatter")
     parser.add_argument(
         "--models",
-        help="Comma-separated aliases (models.toml) or OpenRouter slugs; overrides "
-        "--preset and frontmatter",
+        help="Comma-separated aliases (models.toml) or OpenRouter slugs; overrides frontmatter",
     )
-    parser.add_argument("--preset", help="Preset name from models.toml")
     parser.add_argument("--config", type=Path, default=Path("models.toml"), help="Config path")
     parser.add_argument("--out", type=Path, default=Path("runs"), help="Output root directory")
     parser.add_argument(
@@ -56,23 +54,13 @@ def _parse_args(argv: list[str]) -> argparse.Namespace:
 def _select_models(args: argparse.Namespace, prompt: PromptSpec, config: Config) -> list[str]:
     if args.models:
         return [m for m in args.models.split(",") if m.strip()]
-    if args.preset:
-        preset = config.presets.get(args.preset)
-        if preset is None:
-            raise SystemExit(
-                f"error: unknown preset '{args.preset}'. "
-                f"Available: {', '.join(sorted(config.presets)) or '(none)'}"
-            )
-        return preset
     if prompt.models:
         return prompt.models
-    default = config.presets.get("default")
-    if not default:
-        raise SystemExit(
-            "error: no models specified. Use --models, --preset, frontmatter 'models', "
-            "or a 'default' preset in models.toml."
-        )
-    return default
+    raise SystemExit(
+        "error: no models specified. Use --models (e.g. --models gpt,glm-flash) or add a "
+        f"'models:' list to the prompt frontmatter.\nAvailable aliases: "
+        f"{', '.join(sorted(config.aliases)) or '(none - add some to models.toml)'}"
+    )
 
 
 def _dry_results(pairs: list[tuple[str, str]]) -> list[ModelResult]:
