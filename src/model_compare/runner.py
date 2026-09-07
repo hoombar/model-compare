@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import asyncio
+import sys
 import time
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 
 import httpx
@@ -93,21 +95,75 @@ async def run_all(
     user_prompt: str,
     api_key: str,
     timeout: float,
+    on_result: Callable[[ModelResult], Awaitable[None]] | None = None,
 ) -> list[ModelResult]:
-    """Run every model in parallel, preserving input order."""
+    """Run every model in parallel, preserving input order.
+
+    `on_result` fires as each model completes (completion order, not input order).
+    """
     async with httpx.AsyncClient() as client:
-        results = await asyncio.gather(
-            *(
-                run_model(
-                    client,
-                    api_key,
-                    alias,
-                    slug,
-                    system_prompt,
-                    user_prompt,
-                    timeout,
-                )
-                for alias, slug in pairs
+        tasks = [
+            asyncio.create_task(
+                run_model(client, api_key, alias, slug, system_prompt, user_prompt, timeout)
             )
+            for alias, slug in pairs
+        ]
+        if on_result is not None:
+            for task in asyncio.as_completed(tasks):
+                result = await task
+                await on_result(result)
+        else:
+            results = await asyncio.gather(*tasks)
+            return list(results)
+        return [task.result() for task in tasks]
+
+
+async def _run_with_progress(
+    pairs: list[tuple[str, str]],
+    system_prompt: str,
+    user_prompt: str,
+    api_key: str,
+    timeout: float,
+    total: int,
+) -> list[ModelResult]:
+    """Run all models with a live progress line; log each result as it lands."""
+    done = 0
+    lock = asyncio.Lock()
+
+    async def report(result: ModelResult) -> None:
+        nonlocal done
+        async with lock:
+            done += 1
+            if result.ok:
+                status = f"done    {result.latency_s:6.1f}s  {result.completion_tokens} tok"
+            else:
+                status = "ERROR"
+            sys.stdout.write(f"\r\033[K  [{done:>2}/{total}] {result.alias}: {status}\n")
+            elapsed = time.monotonic() - t0
+            sys.stdout.write(
+                f"  waiting... {int(elapsed // 60):02d}:{int(elapsed % 60):02d} elapsed"
+            )
+            sys.stdout.flush()
+
+    async def ticker() -> None:
+        while True:
+            elapsed = time.monotonic() - t0
+            sys.stdout.write(
+                f"\r\033[K  waiting... {int(elapsed // 60):02d}:{int(elapsed % 60):02d} elapsed"
+            )
+            sys.stdout.flush()
+            await asyncio.sleep(1)
+
+    t0 = time.monotonic()
+    sys.stdout.write("  waiting... 00:00 elapsed")
+    sys.stdout.flush()
+    tick_task = asyncio.create_task(ticker())
+    try:
+        results = await run_all(
+            pairs, system_prompt, user_prompt, api_key, timeout, on_result=report
         )
-    return list(results)
+    finally:
+        tick_task.cancel()
+    sys.stdout.write("\r\033[K")
+    sys.stdout.flush()
+    return results

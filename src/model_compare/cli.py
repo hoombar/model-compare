@@ -13,7 +13,7 @@ from pathlib import Path
 from .config import load_config, resolve_models
 from .prompts import load_prompt
 from .report import slugify, write_html, write_run
-from .runner import ModelResult, run_all
+from .runner import ModelResult, _run_with_progress
 
 
 def _load_dotenv(path: Path) -> None:
@@ -161,7 +161,9 @@ def main(argv: list[str] | None = None) -> int:
             return 0
         print(f"Running '{prompt.title}' against {len(pairs)} model(s)...")
         results = asyncio.run(
-            run_all(pairs, prompt.system_prompt, prompt.body, api_key, args.timeout)
+            _run_with_progress(
+                pairs, prompt.system_prompt, prompt.body, api_key, args.timeout, len(pairs)
+            )
         )
 
     stamp = dt.datetime.now().astimezone().strftime("%Y%m%d-%H%M%S")
