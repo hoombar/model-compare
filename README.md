@@ -25,8 +25,9 @@ model-compare
 ```
 
 Choose an existing prompt or write a one-off prompt, select the models to compare, then
-watch each request complete. Custom prompts use the default system prompt and are included
-in the report without being saved to `prompts/`.
+watch each request complete. The model pane can also add aliases to or delete aliases from
+`models.toml`; changes appear in the selector immediately. Custom prompts use the default
+system prompt and are included in the report without being saved to `prompts/`.
 
 The noninteractive CLI remains available for scripts and repeatable runs:
 
@@ -102,5 +103,8 @@ glm-flash = "z-ai/glm-5.3-flash"
 
 # default_system_prompt = "You are a thoughtful assistant."
 ```
+
+Use **Add model** and **Delete model** in the TUI for quick changes. These actions preserve
+the existing ordering, comments, and other settings in `models.toml`.
 
 See `model-compare --help` for all flags.
