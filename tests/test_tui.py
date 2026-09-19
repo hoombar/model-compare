@@ -37,6 +37,20 @@ async def test_tui_loads_prompts_and_preselects_models(tmp_path: Path) -> None:
 
 
 @pytest.mark.asyncio
+async def test_tui_persists_selected_theme(tmp_path: Path) -> None:
+    make_project(tmp_path)
+    theme_path = tmp_path / "settings" / "theme"
+    app = ModelCompareApp(tmp_path, theme_path=theme_path)
+
+    async with app.run_test() as pilot:
+        app.theme = "textual-light"
+        await pilot.pause()
+
+    assert theme_path.read_text() == "textual-light\n"
+    assert ModelCompareApp(tmp_path, theme_path=theme_path).theme == "textual-light"
+
+
+@pytest.mark.asyncio
 async def test_tui_builds_a_custom_prompt(tmp_path: Path) -> None:
     make_project(tmp_path)
     app = ModelCompareApp(tmp_path)

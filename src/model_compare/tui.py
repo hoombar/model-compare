@@ -10,6 +10,7 @@ from textual import on, work
 from textual.app import App, ComposeResult
 from textual.containers import Container, Horizontal, Vertical
 from textual.screen import ModalScreen
+from textual.theme import Theme
 from textual.widgets import (
     Button,
     DataTable,
@@ -48,6 +49,13 @@ def find_project_dir() -> Path:
     if (source_root / "models.toml").exists() or (source_root / "prompts").is_dir():
         return source_root
     return cwd
+
+
+def theme_settings_path() -> Path:
+    """Return the per-user path used to remember the TUI theme."""
+    config_home = os.environ.get("XDG_CONFIG_HOME")
+    root = Path(config_home).expanduser() if config_home else Path.home() / ".config"
+    return root / "model-compare" / "theme"
 
 
 class ConfirmRun(ModalScreen[bool]):
@@ -357,9 +365,20 @@ class ModelCompareApp(App[None]):
     """
     BINDINGS: ClassVar = [("q", "quit", "Quit")]
 
-    def __init__(self, project_dir: Path | None = None) -> None:
+    def __init__(
+        self,
+        project_dir: Path | None = None,
+        theme_path: Path | None = None,
+    ) -> None:
         super().__init__()
         self.project_dir = project_dir or find_project_dir()
+        self.theme_path = theme_path or theme_settings_path()
+        try:
+            saved_theme = self.theme_path.read_text(encoding="utf-8").strip()
+        except (OSError, UnicodeError):
+            saved_theme = ""
+        if saved_theme in self.available_themes:
+            self.theme = saved_theme
         self.config = Config()
         self.prompts: list[PromptSpec] = []
         self.startup_error: str | None = None
@@ -417,6 +436,7 @@ class ModelCompareApp(App[None]):
         yield Footer()
 
     def on_mount(self) -> None:
+        self.theme_changed_signal.subscribe(self, self._save_theme, immediate=True)
         if self.prompts:
             self._show_prompt_preview(0)
         else:
@@ -426,6 +446,13 @@ class ModelCompareApp(App[None]):
             self._show_selection_error(f"Could not load project files: {self.startup_error}")
         elif not self.config.aliases:
             self._show_selection_error("No model aliases found in models.toml.")
+
+    def _save_theme(self, theme: Theme) -> None:
+        try:
+            self.theme_path.parent.mkdir(parents=True, exist_ok=True)
+            self.theme_path.write_text(f"{theme.name}\n", encoding="utf-8")
+        except OSError as exc:
+            self.notify(f"Could not save theme: {exc}", severity="warning")
 
     @on(RadioSet.Changed, "#prompt-choice")
     def prompt_changed(self, event: RadioSet.Changed) -> None:
