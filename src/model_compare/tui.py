@@ -24,7 +24,14 @@ from textual.widgets import (
     TextArea,
 )
 
-from .config import Config, load_config, load_dotenv
+from .config import (
+    Config,
+    add_model,
+    delete_model,
+    load_config,
+    load_dotenv,
+    validate_model,
+)
 from .prompts import PromptSpec, custom_prompt, discover_prompts
 from .report import write_results
 from .runner import ModelResult, run_all
@@ -95,6 +102,151 @@ class ConfirmRun(ModalScreen[bool]):
         self.dismiss(False)
 
 
+class AddModel(ModalScreen[tuple[str, str] | None]):
+    """Collect a new model alias and OpenRouter slug."""
+
+    DEFAULT_CSS = """
+    AddModel {
+        align: center middle;
+    }
+
+    AddModel > Vertical {
+        width: 64;
+        height: auto;
+        padding: 1 2;
+        border: round $accent;
+        background: $surface;
+    }
+
+    AddModel Input, AddModel #add-model-message {
+        margin-bottom: 1;
+    }
+
+    AddModel #add-model-message {
+        height: auto;
+        min-height: 1;
+        color: $warning;
+    }
+
+    AddModel Horizontal {
+        height: auto;
+        align-horizontal: right;
+    }
+
+    AddModel Button {
+        margin-left: 1;
+    }
+    """
+
+    BINDINGS: ClassVar = [("escape", "cancel", "Cancel")]
+
+    def __init__(self, existing_aliases: set[str]) -> None:
+        super().__init__()
+        self.existing_aliases = existing_aliases
+
+    def compose(self) -> ComposeResult:
+        with Vertical():
+            yield Label("Add model", classes="dialog-title")
+            yield Input(placeholder="Short alias, e.g. sonnet", id="new-model-alias")
+            yield Input(placeholder="OpenRouter slug, e.g. anthropic/model-name", id="new-model-slug")
+            yield Static(id="add-model-message")
+            with Horizontal():
+                yield Button("Cancel", id="add-model-cancel")
+                yield Button("Add", id="add-model-save", variant="primary")
+
+    @on(Button.Pressed)
+    def handle_button(self, event: Button.Pressed) -> None:
+        if event.button.id == "add-model-cancel":
+            self.dismiss(None)
+            return
+        try:
+            model = validate_model(
+                self.query_one("#new-model-alias", Input).value,
+                self.query_one("#new-model-slug", Input).value,
+            )
+            if model[0] in self.existing_aliases:
+                raise ValueError(f"model alias already exists: {model[0]}")
+        except ValueError as exc:
+            self.query_one("#add-model-message", Static).update(str(exc))
+            return
+        self.dismiss(model)
+
+    def action_cancel(self) -> None:
+        self.dismiss(None)
+
+
+class DeleteModel(ModalScreen[str | None]):
+    """Choose one configured model to remove."""
+
+    DEFAULT_CSS = """
+    DeleteModel {
+        align: center middle;
+    }
+
+    DeleteModel > Vertical {
+        width: 68;
+        height: auto;
+        max-height: 80%;
+        padding: 1 2;
+        border: round $error;
+        background: $surface;
+    }
+
+    DeleteModel RadioSet {
+        height: auto;
+        max-height: 18;
+        margin-bottom: 1;
+    }
+
+    DeleteModel Horizontal {
+        height: auto;
+        align-horizontal: right;
+    }
+
+    DeleteModel Button {
+        margin-left: 1;
+    }
+    """
+
+    BINDINGS: ClassVar = [("escape", "cancel", "Cancel")]
+
+    def __init__(self, models: list[tuple[str, str]]) -> None:
+        super().__init__()
+        self.models = models
+
+    def compose(self) -> ComposeResult:
+        with Vertical():
+            yield Label("Delete model from models.toml", classes="dialog-title")
+            yield RadioSet(
+                *[
+                    RadioButton(
+                        f"{alias}  [dim]{slug}[/dim]",
+                        value=index == 0,
+                        id=f"delete-choice-{index}",
+                    )
+                    for index, (alias, slug) in enumerate(self.models)
+                ],
+                id="delete-model-choice",
+            )
+            with Horizontal():
+                yield Button("Cancel", id="delete-model-cancel")
+                yield Button("Delete", id="delete-model-confirm", variant="error")
+
+    @on(Button.Pressed)
+    def handle_button(self, event: Button.Pressed) -> None:
+        if event.button.id == "delete-model-cancel":
+            self.dismiss(None)
+            return
+        pressed = self.query_one("#delete-model-choice", RadioSet).pressed_button
+        if pressed is None:
+            return
+        index = int((pressed.id or "").removeprefix("delete-choice-"))
+        self.dismiss(self.models[index][0])
+
+    def action_cancel(self) -> None:
+        self.dismiss(None)
+
+
 class ModelCompareApp(App[None]):
     """Select a prompt and models, then monitor a comparison run."""
 
@@ -157,6 +309,15 @@ class ModelCompareApp(App[None]):
 
     #model-choice {
         height: 1fr;
+    }
+
+    #model-actions {
+        height: auto;
+        margin-top: 1;
+    }
+
+    #model-actions Button {
+        margin-right: 1;
     }
 
     #selection-message, #run-message {
@@ -242,6 +403,9 @@ class ModelCompareApp(App[None]):
                         ],
                         id="model-choice",
                     )
+                    with Horizontal(id="model-actions"):
+                        yield Button("Add model", id="add-model")
+                        yield Button("Delete model", id="delete-model", variant="error")
             yield Static(id="selection-message")
             with Horizontal(id="run-actions"):
                 yield Button("Run comparison", id="run", variant="primary")
@@ -293,6 +457,59 @@ class ModelCompareApp(App[None]):
     def _selected_models(self) -> list[tuple[str, str]]:
         aliases = self.query_one("#model-choice", SelectionList).selected
         return [(alias, self.config.aliases[alias]) for alias in aliases]
+
+    @on(Button.Pressed, "#add-model")
+    def request_add_model(self) -> None:
+        self.push_screen(AddModel(set(self.config.aliases)), self._add_model)
+
+    def _add_model(self, model: tuple[str, str] | None) -> None:
+        if model is None:
+            return
+        alias, slug = model
+        selected = set(self.query_one("#model-choice", SelectionList).selected)
+        try:
+            add_model(self.project_dir / "models.toml", alias, slug)
+            selected.add(alias)
+            self._refresh_models(selected)
+        except (OSError, ValueError) as exc:
+            self._show_selection_error(f"Could not add model: {exc}")
+            return
+        self.query_one("#selection-message", Static).update("")
+        self.notify(f"Added {alias}")
+
+    @on(Button.Pressed, "#delete-model")
+    def request_delete_model(self) -> None:
+        if not self.config.aliases:
+            self._show_selection_error("There are no models to delete.")
+            return
+        self.push_screen(DeleteModel(list(self.config.aliases.items())), self._delete_model)
+
+    def _delete_model(self, alias: str | None) -> None:
+        if alias is None:
+            return
+        selected = set(self.query_one("#model-choice", SelectionList).selected)
+        selected.discard(alias)
+        try:
+            delete_model(self.project_dir / "models.toml", alias)
+            self._refresh_models(selected)
+        except (OSError, ValueError) as exc:
+            self._show_selection_error(f"Could not delete model: {exc}")
+            return
+        self.query_one("#selection-message", Static).update("")
+        self.notify(f"Deleted {alias}")
+
+    def _refresh_models(self, selected: set[str]) -> None:
+        self.config = load_config(self.project_dir / "models.toml")
+        choices = self.query_one("#model-choice", SelectionList)
+        choices.clear_options()
+        choices.add_options(
+            (
+                f"{alias}  [dim]{slug}[/dim]",
+                alias,
+                alias in selected,
+            )
+            for alias, slug in self.config.aliases.items()
+        )
 
     @on(Button.Pressed, "#run")
     def request_run(self) -> None:

@@ -54,6 +54,42 @@ async def test_tui_builds_a_custom_prompt(tmp_path: Path) -> None:
 
 
 @pytest.mark.asyncio
+async def test_tui_adds_a_model_and_selects_it(tmp_path: Path) -> None:
+    make_project(tmp_path)
+    app = ModelCompareApp(tmp_path)
+
+    async with app.run_test() as pilot:
+        await pilot.click("#add-model")
+        app.screen.query_one("#new-model-alias", Input).value = "new"
+        app.screen.query_one("#new-model-slug", Input).value = "vendor/new"
+        await pilot.click("#add-model-save")
+        await pilot.pause()
+
+        assert app.config.aliases["new"] == "vendor/new"
+        assert app.query_one("#model-choice", SelectionList).selected == [
+            "first",
+            "second",
+            "new",
+        ]
+        assert 'new = "vendor/new"' in (tmp_path / "models.toml").read_text()
+
+
+@pytest.mark.asyncio
+async def test_tui_deletes_a_model_and_refreshes_choices(tmp_path: Path) -> None:
+    make_project(tmp_path)
+    app = ModelCompareApp(tmp_path)
+
+    async with app.run_test() as pilot:
+        await pilot.click("#delete-model")
+        await pilot.click("#delete-model-confirm")
+        await pilot.pause()
+
+        assert app.config.aliases == {"second": "vendor/second"}
+        assert app.query_one("#model-choice", SelectionList).selected == ["second"]
+        assert "first =" not in (tmp_path / "models.toml").read_text()
+
+
+@pytest.mark.asyncio
 async def test_tui_runs_selected_models_and_writes_report(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
