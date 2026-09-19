@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import datetime as dt
 import html
 import re
+from dataclasses import dataclass
 from pathlib import Path
 
 from markdown_it import MarkdownIt
@@ -12,6 +14,13 @@ from .prompts import PromptSpec
 from .runner import ModelResult
 
 _MD = MarkdownIt("default", {"html": True})
+
+
+@dataclass(frozen=True)
+class RunArtifacts:
+    run_dir: Path
+    markdown_path: Path
+    html_path: Path | None
 
 HTML_TEMPLATE = """<!doctype html>
 <html lang="en">
@@ -97,7 +106,8 @@ def build_markdown(prompt: PromptSpec, results: list[ModelResult], generated_at:
     lines.append(f"# Model Compare: {prompt.title}")
     lines.append("")
     lines.append(f"- **Run:** {generated_at}")
-    lines.append(f"- **Prompt file:** `{prompt.source_path}`")
+    prompt_source = f"`{prompt.source_path}`" if prompt.source_path else "Custom prompt"
+    lines.append(f"- **Prompt source:** {prompt_source}")
     lines.append(f"- **Models:** {len(results)}")
     lines.append("")
     lines.append("## Prompt")
@@ -173,3 +183,21 @@ def write_html(md_path: Path, title: str) -> Path:
         HTML_TEMPLATE.format(title=html.escape(title), body=body),
     )
     return html_path
+
+
+def write_results(
+    output_root: Path,
+    prompt: PromptSpec,
+    results: list[ModelResult],
+    *,
+    include_html: bool = True,
+    dry_run: bool = False,
+    now: dt.datetime | None = None,
+) -> RunArtifacts:
+    """Write all artifacts for a completed comparison run."""
+    generated_at = (now or dt.datetime.now().astimezone()).strftime("%Y%m%d-%H%M%S")
+    prefix = "dryrun-" if dry_run else ""
+    run_dir = output_root / f"{prefix}{generated_at}-{slugify(prompt.title)}"
+    markdown_path = write_run(run_dir, prompt, results, generated_at)
+    html_path = write_html(markdown_path, prompt.title) if include_html else None
+    return RunArtifacts(run_dir, markdown_path, html_path)

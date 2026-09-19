@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import argparse
 import asyncio
-import datetime as dt
 import os
 import random
 import sys
@@ -12,7 +11,7 @@ from pathlib import Path
 
 from .config import load_config, resolve_models
 from .prompts import load_prompt
-from .report import slugify, write_html, write_run
+from .report import write_results
 from .runner import ModelResult, _run_with_progress
 
 
@@ -166,18 +165,20 @@ def main(argv: list[str] | None = None) -> int:
             )
         )
 
-    stamp = dt.datetime.now().astimezone().strftime("%Y%m%d-%H%M%S")
-    prefix = "dryrun-" if args.dry_run else ""
-    run_dir = args.out / f"{prefix}{stamp}-{slugify(prompt.title)}"
-    md_path = write_run(run_dir, prompt, results, stamp)
-    html_path = None if args.no_html else write_html(md_path, prompt.title)
+    artifacts = write_results(
+        args.out,
+        prompt,
+        results,
+        include_html=not args.no_html,
+        dry_run=args.dry_run,
+    )
 
     print()
     _print_summary(results)
-    print(f"\nRun:    {run_dir}")
-    print(f"Report: {md_path}")
-    if html_path:
-        print(f"HTML:   {html_path}")
+    print(f"\nRun:    {artifacts.run_dir}")
+    print(f"Report: {artifacts.markdown_path}")
+    if artifacts.html_path:
+        print(f"HTML:   {artifacts.html_path}")
     return 0
 
 

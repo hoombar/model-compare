@@ -13,7 +13,7 @@ class PromptSpec:
     title: str
     system_prompt: str
     body: str
-    source_path: Path
+    source_path: Path | None
 
 
 def load_prompt(path: Path, default_system_prompt: str) -> PromptSpec:
@@ -29,4 +29,27 @@ def load_prompt(path: Path, default_system_prompt: str) -> PromptSpec:
         system_prompt=system_prompt,
         body=body,
         source_path=path,
+    )
+
+
+def discover_prompts(directory: Path, default_system_prompt: str) -> list[PromptSpec]:
+    """Load available Markdown prompts in filename order."""
+    if not directory.is_dir():
+        return []
+    return [load_prompt(path, default_system_prompt) for path in sorted(directory.glob("*.md"))]
+
+
+def custom_prompt(title: str, body: str, default_system_prompt: str) -> PromptSpec:
+    """Build a one-off prompt that is not backed by a file."""
+    title = title.strip()
+    body = body.strip()
+    if not title:
+        raise ValueError("custom prompt needs a title")
+    if not body:
+        raise ValueError("custom prompt has no body text")
+    return PromptSpec(
+        title=title,
+        system_prompt=default_system_prompt,
+        body=body,
+        source_path=None,
     )
