@@ -3,15 +3,19 @@
 from __future__ import annotations
 
 import os
+import re
 import sys
 import tomllib
 from dataclasses import dataclass, field
 from pathlib import Path
 
+import tomlkit
+
 DEFAULT_SYSTEM_PROMPT = (
     "You are a thoughtful, knowledgeable assistant. "
     "Answer directly and clearly, and follow any format requirements given."
 )
+MODEL_ALIAS_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
 
 
 def load_dotenv(path: Path) -> None:
@@ -45,6 +49,46 @@ def load_config(path: Path | None = None) -> Config:
     if default_system_prompt:
         config.default_system_prompt = str(default_system_prompt)
     return config
+
+
+def validate_model(alias: str, slug: str) -> tuple[str, str]:
+    """Validate and normalize a model alias and OpenRouter slug."""
+    alias = alias.strip()
+    slug = slug.strip()
+    if not MODEL_ALIAS_PATTERN.fullmatch(alias) or alias == "default_system_prompt":
+        raise ValueError("alias must use letters, numbers, dots, dashes, or underscores")
+    if slug.count("/") != 1 or any(character.isspace() for character in slug):
+        raise ValueError("model slug must look like provider/model")
+    provider, model = slug.split("/", 1)
+    if not provider or not model:
+        raise ValueError("model slug must look like provider/model")
+    return alias, slug
+
+
+def add_model(path: Path, alias: str, slug: str) -> None:
+    """Add a model while preserving the existing TOML formatting and comments."""
+    alias, slug = validate_model(alias, slug)
+    document = tomlkit.parse(path.read_text()) if path.exists() else tomlkit.document()
+    if alias in document:
+        raise ValueError(f"model alias already exists: {alias}")
+    document[alias] = slug
+    _write_toml(path, tomlkit.dumps(document))
+
+
+def delete_model(path: Path, alias: str) -> None:
+    """Delete one model alias while preserving the rest of the TOML document."""
+    document = tomlkit.parse(path.read_text()) if path.exists() else tomlkit.document()
+    if alias not in document or alias == "default_system_prompt":
+        raise ValueError(f"model alias not found: {alias}")
+    del document[alias]
+    _write_toml(path, tomlkit.dumps(document))
+
+
+def _write_toml(path: Path, content: str) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = path.with_suffix(f"{path.suffix}.tmp")
+    temporary.write_text(content)
+    temporary.replace(path)
 
 
 def resolve_models(raw: list[str], config: Config) -> list[tuple[str, str]]:
