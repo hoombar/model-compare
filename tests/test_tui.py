@@ -1,0 +1,75 @@
+from pathlib import Path
+
+import pytest
+from textual.widgets import Input, SelectionList, Static, TextArea
+
+from model_compare import tui
+from model_compare.runner import ModelResult
+from model_compare.tui import ModelCompareApp
+
+
+def make_project(path: Path) -> None:
+    (path / "models.toml").write_text(
+        'first = "vendor/first"\nsecond = "vendor/second"\n'
+    )
+    prompts = path / "prompts"
+    prompts.mkdir()
+    (prompts / "question.md").write_text("---\ntitle: Existing question\n---\nWhy?\n")
+
+
+@pytest.mark.asyncio
+async def test_tui_loads_prompts_and_preselects_models(tmp_path: Path) -> None:
+    make_project(tmp_path)
+    app = ModelCompareApp(tmp_path)
+
+    async with app.run_test():
+        assert app.prompts[0].title == "Existing question"
+        assert "Why?" in str(app.query_one("#prompt-preview", Static).content)
+        assert app.query_one("#model-choice", SelectionList).selected == ["first", "second"]
+
+
+@pytest.mark.asyncio
+async def test_tui_builds_a_custom_prompt(tmp_path: Path) -> None:
+    make_project(tmp_path)
+    app = ModelCompareApp(tmp_path)
+
+    async with app.run_test() as pilot:
+        await pilot.click("#prompt-custom")
+        app.query_one("#custom-title", Input).value = "One-off"
+        app.query_one("#custom-body", TextArea).load_text("What changed?")
+
+        prompt = app._selected_prompt()
+
+        assert prompt.title == "One-off"
+        assert prompt.body == "What changed?"
+        assert prompt.source_path is None
+
+
+@pytest.mark.asyncio
+async def test_tui_runs_selected_models_and_writes_report(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    make_project(tmp_path)
+    monkeypatch.setenv("OPENROUTER_API_KEY", "test-key")
+
+    async def fake_run_all(pairs, system_prompt, user_prompt, api_key, timeout, on_result):
+        results = [
+            ModelResult(alias=alias, slug=slug, content=f"Response from {alias}")
+            for alias, slug in pairs
+        ]
+        for result in results:
+            await on_result(result)
+        return results
+
+    monkeypatch.setattr(tui, "run_all", fake_run_all)
+    app = ModelCompareApp(tmp_path)
+
+    async with app.run_test() as pilot:
+        await pilot.click("#run")
+        await pilot.click("#confirm")
+        await app.workers.wait_for_complete()
+
+        assert "Run complete" in str(app.query_one("#run-message", Static).content)
+        reports = list((tmp_path / "runs").glob("*/report.md"))
+        assert len(reports) == 1
+        assert "Response from first" in reports[0].read_text()

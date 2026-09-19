@@ -9,6 +9,7 @@ dependencies = [
   "markdown-it-py>=3.0",
   "python-frontmatter>=1.1",
   "pyyaml>=6.0",
+  "textual>=6.0",
 ]
 
 [project.scripts]
@@ -24,6 +25,7 @@ packages = ["src/model_compare"]
 [dependency-groups]
 dev = [
   "pytest>=8.3",
+  "pytest-asyncio>=0.24",
   "ruff>=0.8",
 ]
 

@@ -9,22 +9,10 @@ import random
 import sys
 from pathlib import Path
 
-from .config import load_config, resolve_models
+from .config import load_config, load_dotenv, resolve_models
 from .prompts import load_prompt
 from .report import write_results
 from .runner import ModelResult, _run_with_progress
-
-
-def _load_dotenv(path: Path) -> None:
-    """Minimal .env loader; never overrides existing environment variables."""
-    if not path.exists():
-        return
-    for line in path.read_text().splitlines():
-        line = line.strip()
-        if not line or line.startswith("#") or "=" not in line:
-            continue
-        key, _, value = line.partition("=")
-        os.environ.setdefault(key.strip(), value.strip().strip("'").strip('"'))
 
 
 def _parse_args(argv: list[str]) -> argparse.Namespace:
@@ -120,7 +108,7 @@ def _fmt_cost(value: float | None) -> str:
 
 def main(argv: list[str] | None = None) -> int:
     args = _parse_args(sys.argv[1:] if argv is None else argv)
-    _load_dotenv(Path(".env"))
+    load_dotenv(Path(".env"))
     config = load_config(args.config)
 
     if not args.prompt_file.exists():
