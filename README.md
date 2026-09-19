@@ -9,14 +9,31 @@ per model. Mermaid diagrams in model responses render natively in the report.
 ```bash
 uv sync
 cp .env.example .env   # then add your OpenRouter API key
+uv tool install --editable .
 ```
+
+The editable tool installation puts `model-compare` on your path while keeping it linked
+to this checkout. If the command is not found, run `uv tool update-shell` and restart the
+shell. Re-run the install with `--force` after changing dependencies.
 
 ## Usage
 
+Launch the interactive terminal interface:
+
 ```bash
-uv run model-compare prompts/citation-temptation.md --models gpt,glm-flash
-uv run model-compare prompts/receipt-free-will.md --models tencent/hy4-preview,xiaomi/mimo-v2.5
-uv run model-compare prompts/experience-machine.md      # every alias in models.toml
+model-compare
+```
+
+Choose an existing prompt or write a one-off prompt, select the models to compare, then
+watch each request complete. Custom prompts use the default system prompt and are included
+in the report without being saved to `prompts/`.
+
+The noninteractive CLI remains available for scripts and repeatable runs:
+
+```bash
+model-compare prompts/citation-temptation.md --models gpt,glm-flash
+model-compare prompts/receipt-free-will.md --models tencent/hy4-preview,xiaomi/mimo-v2.5
+model-compare prompts/experience-machine.md      # every alias in models.toml
 ```
 
 `--models` takes short aliases from `models.toml` (a shortlist drawn from OpenRouter's
@@ -25,6 +42,9 @@ picking) or full OpenRouter slugs. Omit it to run against every alias in `models
 either way you'll be asked to confirm the model list before anything runs (`-y` skips
 that). Other flags: `--timeout SECONDS` (default 180), `--no-html`, `--dry-run` (canned
 responses, no API calls), `--out DIR`.
+
+The TUI finds `models.toml`, `.env`, `prompts/`, and `runs/` in the current directory or
+the editable source checkout. Set `MODEL_COMPARE_HOME` to use a different project directory.
 
 ## Prompt files
 
@@ -83,4 +103,4 @@ glm-flash = "z-ai/glm-5.3-flash"
 # default_system_prompt = "You are a thoughtful assistant."
 ```
 
-See `uv run model-compare --help` for all flags.
+See `model-compare --help` for all flags.

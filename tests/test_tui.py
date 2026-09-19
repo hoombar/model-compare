@@ -5,7 +5,7 @@ from textual.widgets import Input, SelectionList, Static, TextArea
 
 from model_compare import tui
 from model_compare.runner import ModelResult
-from model_compare.tui import ModelCompareApp
+from model_compare.tui import ModelCompareApp, find_project_dir
 
 
 def make_project(path: Path) -> None:
@@ -15,6 +15,14 @@ def make_project(path: Path) -> None:
     prompts = path / "prompts"
     prompts.mkdir()
     (prompts / "question.md").write_text("---\ntitle: Existing question\n---\nWhy?\n")
+
+
+def test_project_dir_can_be_configured(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("MODEL_COMPARE_HOME", str(tmp_path))
+
+    assert find_project_dir() == tmp_path
 
 
 @pytest.mark.asyncio

@@ -30,6 +30,19 @@ from .report import write_results
 from .runner import ModelResult, run_all
 
 
+def find_project_dir() -> Path:
+    """Find prompts and configuration for local and editable installations."""
+    if configured := os.environ.get("MODEL_COMPARE_HOME"):
+        return Path(configured).expanduser()
+    cwd = Path.cwd()
+    if (cwd / "models.toml").exists() or (cwd / "prompts").is_dir():
+        return cwd
+    source_root = Path(__file__).resolve().parents[2]
+    if (source_root / "models.toml").exists() or (source_root / "prompts").is_dir():
+        return source_root
+    return cwd
+
+
 class ConfirmRun(ModalScreen[bool]):
     """Confirm a potentially billable model run."""
 
@@ -185,7 +198,7 @@ class ModelCompareApp(App[None]):
 
     def __init__(self, project_dir: Path | None = None) -> None:
         super().__init__()
-        self.project_dir = project_dir or Path.cwd()
+        self.project_dir = project_dir or find_project_dir()
         self.config = Config()
         self.prompts: list[PromptSpec] = []
         self.startup_error: str | None = None

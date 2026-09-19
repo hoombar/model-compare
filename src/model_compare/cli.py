@@ -107,7 +107,14 @@ def _fmt_cost(value: float | None) -> str:
 
 
 def main(argv: list[str] | None = None) -> int:
-    args = _parse_args(sys.argv[1:] if argv is None else argv)
+    raw_args = sys.argv[1:] if argv is None else argv
+    if not raw_args:
+        from .tui import run_tui
+
+        run_tui()
+        return 0
+
+    args = _parse_args(raw_args)
     load_dotenv(Path(".env"))
     config = load_config(args.config)
 
