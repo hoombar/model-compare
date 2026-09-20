@@ -4,6 +4,12 @@ Run one prompt against many LLMs (via [OpenRouter](https://openrouter.ai)) and g
 side-by-side comparison report in Markdown + HTML, including latency, token usage and cost
 per model. Mermaid diagrams in model responses render natively in the report.
 
+![Model Compare with a saved reasoning prompt and five models selected](docs/screenshots/saved-prompt.webp)
+
+The tool does not score responses or appoint another model as judge. It keeps the prompt,
+answers and run metadata together so you can compare them against your own knowledge,
+answer keys or source material.
+
 ## Setup
 
 ```bash
@@ -28,6 +34,8 @@ Choose an existing prompt or write a one-off prompt, select the models to compar
 watch each request complete. The model pane can also add aliases to or delete aliases from
 `models.toml`; changes appear in the selector immediately. Custom prompts use the default
 system prompt and are included in the report without being saved to `prompts/`.
+
+![A custom coffee-machine repair prompt ready to run against Gemini and DeepSeek](docs/screenshots/custom-prompt.webp)
 
 The noninteractive CLI remains available for scripts and repeatable runs:
 
@@ -92,6 +100,8 @@ runs are prefixed `dryrun-`):
 
 Models that fail (rate limits, provider errors) don't abort the run — they show up as
 `(error)` rows in the table and error blocks in their section.
+
+![A completed two-model comparison with report paths](docs/screenshots/run-complete.webp)
 
 ## models.toml
 
